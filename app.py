@@ -132,11 +132,19 @@ elif page == "📊 Dashboard":
             st.markdown("### 🔤 Top Purchase Keywords")
             st.bar_chart(top_keywords)
 
+        if len(full_tx) < 2:
+            st.info("Only one transaction logged — need at least two to calculate time between purchases.")
+
         full_tx["DATE"] = pd.to_datetime(full_tx["DATE"], errors="coerce")
         full_tx = full_tx.sort_values("DATE")
         full_tx["DAYS SINCE LAST"] = full_tx["DATE"].diff().dt.days
         longest_gap = full_tx["DAYS SINCE LAST"].max()
-        st.metric("Longest Gap Between Purchases", f"{int(longest_gap)} days")
+
+        if pd.isna(longest_gap):
+            st.metric("Longest Gap Between Purchases", "N/A")
+        else:
+            st.metric("Longest Gap Between Purchases", f"{int(longest_gap)} days")
+
 
         first_dates = full_tx.groupby("MONTH")["DATE"].min().reset_index()
         st.markdown("### 📅 First Purchase Each Month")
