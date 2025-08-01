@@ -40,7 +40,14 @@ def get_balance():
         spent = 0
         remaining = allowance + carryover
 
-        get_balance_sheet().append_row([month_key, allowance, carryover, spent, remaining])
+        get_balance_sheet().append_row([
+            str(month_key),
+            float(allowance),
+            float(carryover),
+            float(spent),
+            float(remaining)
+        ])
+
         return remaining
 
 # Log a new purchase
