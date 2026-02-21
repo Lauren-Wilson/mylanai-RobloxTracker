@@ -36,9 +36,9 @@ def get_balance():
         # Roll over previous month’s remaining
         last_row = df.iloc[-1] if not df.empty else {"REMAINING": 0}
         carryover = last_row["REMAINING"] if not df.empty else 0
-        allowance = 10
+        allowance = 0
         spent = 0
-        
+
         allowance = int(float(allowance or 0))
         carryover = int(float(carryover or 0))
 
