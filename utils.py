@@ -38,7 +38,12 @@ def get_balance():
         carryover = last_row["REMAINING"] if not df.empty else 0
         allowance = 10
         spent = 0
+        
+        allowance = int(float(allowance or 0))
+        carryover = int(float(carryover or 0))
+
         remaining = allowance + carryover
+        # remaining = allowance + carryover
 
         get_balance_sheet().append_row([
             str(month_key),
@@ -50,16 +55,16 @@ def get_balance():
 
         return remaining
 
-# Log a new purchase
-def log_purchase(purchase_date, description, amount):
-    tx_sheet = get_transaction_sheet()
-    tx_sheet.append_row([
-        purchase_date.strftime("%Y-%m-%d"),  # DATE
-        purchase_date.strftime("%Y-%m"),     # MONTH
-        description,
-        amount
-    ])
-    # No need to update monthly_balances if formulas handle it
+# # Log a new purchase
+# def log_purchase(purchase_date, description, amount):
+#     tx_sheet = get_transaction_sheet()
+#     tx_sheet.append_row([
+#         purchase_date.strftime("%Y-%m-%d"),  # DATE
+#         purchase_date.strftime("%Y-%m"),     # MONTH
+#         description,
+#         amount
+#     ])
+#     # No need to update monthly_balances if formulas handle it
 
 # Generate dashboard chart data
 def get_dashboard_data():
@@ -75,3 +80,26 @@ def get_dashboard_data():
 
     monthly_summary = df.groupby("MONTH")["AMOUNT"].sum().reset_index(name="TOTAL SPENT")
     return monthly_summary, df
+
+
+# Example signatures – align with your current Google Sheets helpers
+def log_purchase(tx_date, description, amount):
+    _append_transaction_row(tx_date, "PURCHASE", amount, description)
+
+def log_bonus(tx_date, description, amount):
+    _append_transaction_row(tx_date, "BONUS", amount, description)
+
+def _append_transaction_row(tx_date, tx_type, amount, description):
+    # Normalize
+    d = pd.to_datetime(tx_date).date()
+    month_key = f"{d:%Y-%m}"
+
+    row = {
+        "DATE": f"{d:%Y-%m-%d}",
+        "MONTH": month_key,
+        "TYPE": tx_type,            # <-- NEW
+        "AMOUNT": round(float(amount), 2),
+        "DESCRIPTION": description or "",
+    }
+    # append to `transactions` worksheet
+    # (Use gspread: worksheet.append_row([...], value_input_option="USER_ENTERED"))
