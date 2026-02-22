@@ -85,9 +85,11 @@ def get_dashboard_data():
 # Example signatures – align with your current Google Sheets helpers
 def log_purchase(tx_date, description, amount):
     _append_transaction_row(tx_date, "PURCHASE", amount, description)
+    _update_monthly_balance(tx_date, -abs(float(amount or 0)))
 
 def log_bonus(tx_date, description, amount):
     _append_transaction_row(tx_date, "BONUS", amount, description)
+    _update_monthly_balance(tx_date, abs(float(amount or 0)))
 
 def _append_transaction_row(tx_date, tx_type, amount, description):
     # Normalize
@@ -101,5 +103,75 @@ def _append_transaction_row(tx_date, tx_type, amount, description):
         "AMOUNT": round(float(amount), 2),
         "DESCRIPTION": description or "",
     }
-    # append to `transactions` worksheet
-    # (Use gspread: worksheet.append_row([...], value_input_option="USER_ENTERED"))
+    tx_sheet = get_transaction_sheet()
+    headers = tx_sheet.row_values(1)
+    if headers:
+        header_keys = [h.strip().upper() for h in headers]
+        row_values = [row.get(key, "") for key in header_keys]
+        tx_sheet.append_row(row_values, value_input_option="USER_ENTERED")
+    else:
+        tx_sheet.append_row(
+            [row["DATE"], row["MONTH"], row["DESCRIPTION"], row["AMOUNT"]],
+            value_input_option="USER_ENTERED",
+        )
+
+
+def _to_float(value):
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _update_monthly_balance(tx_date, delta_amount):
+    d = pd.to_datetime(tx_date).date()
+    month_key = f"{d:%Y-%m}"
+    balance_sheet = get_balance_sheet()
+    headers = balance_sheet.row_values(1)
+    if not headers:
+        return
+
+    header_keys = [h.strip().upper() for h in headers]
+    if "MONTH" not in header_keys:
+        return
+
+    records = balance_sheet.get_all_records()
+    df = pd.DataFrame(records)
+    df_months = df["MONTH"].astype(str) if not df.empty and "MONTH" in df.columns else pd.Series(dtype=str)
+
+    def header_index(col_name):
+        return header_keys.index(col_name) + 1
+
+    def update_cell(row_num, col_name, value):
+        if col_name in header_keys:
+            balance_sheet.update_cell(row_num, header_index(col_name), value)
+
+    if not df.empty and month_key in df_months.values:
+        row_idx = df_months[df_months == month_key].index[0]
+        sheet_row = row_idx + 2
+        row = df.iloc[row_idx]
+        spent = _to_float(row.get("SPENT")) + max(0.0, -delta_amount)
+        remaining = _to_float(row.get("REMAINING")) + delta_amount
+
+        update_cell(sheet_row, "SPENT", round(spent, 2))
+        update_cell(sheet_row, "REMAINING", round(remaining, 2))
+        return
+
+    carryover = 0.0
+    if not df.empty and "REMAINING" in df.columns:
+        carryover = _to_float(df.iloc[-1].get("REMAINING"))
+
+    allowance = 0.0
+    spent = max(0.0, -delta_amount)
+    remaining = allowance + carryover + delta_amount
+
+    row_map = {
+        "MONTH": month_key,
+        "ALLOWANCE": round(allowance, 2),
+        "CARRYOVER": round(carryover, 2),
+        "SPENT": round(spent, 2),
+        "REMAINING": round(remaining, 2),
+    }
+
+    row_values = [row_map.get(key, "") for key in header_keys]
+    balance_sheet.append_row(row_values, value_input_option="USER_ENTERED")
